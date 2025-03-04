@@ -1,7 +1,7 @@
 bl_info = {
     "name": "Datamosh Video",
     "author": "Dan Argust",
-    "version": (0, 1, 10),
+    "version": (0, 1, 19),
     "blender": (2, 82, 0),
     "category": "Video Tools",
 }
@@ -17,9 +17,9 @@ else:
 import bpy
 
 def register():
-    bpy.utils.register_class(operator.DATAMOSH_OT_run_datamosh)
-    bpy.utils.register_class(panel.DATAMOSH_PT_panel)
+    operator.register()
+    panel.register()
 
 def unregister():
-    bpy.utils.unregister_class(operator.DATAMOSH_OT_run_datamosh)
-    bpy.utils.unregister_class(panel.DATAMOSH_PT_panel)
+    operator.unregister()
+    panel.unregister()

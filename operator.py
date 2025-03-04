@@ -1,8 +1,8 @@
-import bpy
+import bpy # type: ignore
 import os
 import subprocess
-from bpy.props import StringProperty, BoolProperty
-from bpy.types import Operator
+from bpy.props import StringProperty, BoolProperty # type: ignore
+from bpy.types import Operator, Panel # type: ignore
 from .parse_raw_avi import convert_to_avi, extract_avi_data, create_datamoshed_avi
 
 class DATAMOSH_OT_run_datamosh(bpy.types.Operator):
@@ -27,22 +27,9 @@ class DATAMOSH_OT_run_datamosh(bpy.types.Operator):
             self.report({'ERROR'}, "No sequence editor found in the current scene.")
             return {'CANCELLED'}
 
-        start_frames = []
-        for sequence in sequence_editor.sequences_all:
-            if sequence.type == 'MOVIE':
-                frame = sequence.frame_final_start
-                if frame > 11:
-                    start_frames.append(int(sequence.frame_final_start) - 1)
-
-        if not start_frames:
-            self.report({'ERROR'}, "No movie clips found in the VSE timeline.")
-            return {'CANCELLED'}
-        start_points = []
-        end_points = []
-        for frame in start_frames:
-            start_points.append(frame - 10)
-            end_points.append(frame + 60)
-
+        start_frames = [int(x) for x in scene.datamosh_start_frames.split(',')]
+        start_points = [int(x) for x in scene.datamosh_start_points.split(',')]
+        end_points = [int(x) for x in scene.datamosh_end_points.split(',')]
 
         print(f"Movie clip start frames: {start_frames}")
 
@@ -53,7 +40,50 @@ class DATAMOSH_OT_run_datamosh(bpy.types.Operator):
 
         # Add the output_file as a new movie sequence to the timeline
         bpy.ops.sequencer.movie_strip_add(filepath=output_file, frame_start=1)
-        # Turn off proxy for the newly added movie strip
+
+        # Set the proxy settings for the newly added movie strip
         new_strip = sequence_editor.sequences_all[-1]
         new_strip.use_proxy = False
+        new_strip.proxy.build_25 = False
+        new_strip.proxy.build_50 = False
+        new_strip.proxy.build_75 = False
+        new_strip.proxy.build_100 = False
+        new_strip.proxy.quality = 50
+        
         return {'FINISHED'}
+    
+class DATAMOSH_OT_get_start_frames(bpy.types.Operator):
+    bl_idname = "datamosh.get_start_frames"
+    bl_label = "Get Start Frames"
+    bl_description = "Get the start frames of all movie sequences in the sequencer"
+
+    def execute(self, context):
+        scene = context.scene
+        sequence_editor = scene.sequence_editor
+
+        if not sequence_editor:
+            self.report({'ERROR'}, "No sequence editor found in the current scene.")
+            return {'CANCELLED'}
+
+        start_frames = []
+        for sequence in sequence_editor.sequences_all:
+            if sequence.type == 'MOVIE':
+                frame = int(sequence.frame_final_start) - 1
+                if frame > 11:
+                    start_frames.append(frame)
+
+        scene.datamosh_start_frames = ','.join(map(str, start_frames))
+        scene.datamosh_start_points = ','.join(map(str, [frame - 10 for frame in start_frames]))
+        scene.datamosh_end_points = ','.join(map(str, [frame + 60 for frame in start_frames]))
+        self.report({'INFO'}, f"Start frames: {start_frames}")
+        self.report({'INFO'}, f"Start points: {scene.datamosh_start_points}")
+        self.report({'INFO'}, f"End points: {scene.datamosh_end_points}")
+        return {'FINISHED'}
+
+def register():
+    bpy.utils.register_class(DATAMOSH_OT_run_datamosh)
+    bpy.utils.register_class(DATAMOSH_OT_get_start_frames)
+
+def unregister():
+    bpy.utils.unregister_class(DATAMOSH_OT_run_datamosh)
+    bpy.utils.unregister_class(DATAMOSH_OT_get_start_frames)
