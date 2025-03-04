@@ -22,11 +22,12 @@ This Blender addon allows users to perform datamoshing on video clips rendered f
 3. Click the "Datamosh" button to process the rendered video.
 4. The addon will automatically grab the transition points and apply the datamoshing effect.
 
+## Standalone Usage
+
+1. Change the input file and frame data in the parse_raw_avi.py file
+2. Run the parse_raw_avi.py as a standalone python script
+
 ## Dependencies
 
 - Blender 2.8 or higher
 - Python 3.7 or higher
-
-## License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
