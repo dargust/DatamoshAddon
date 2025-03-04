@@ -238,9 +238,10 @@ def create_datamoshed_avi(avi_data, input_filename, output_filename, start_at=2,
         f_out.write(new_file_data)
     print(f"#### Datamosh complete. Saved to: {output_filename}")
 
-# Example usage
-#convert_to_avi("pickup1.mp4", "temp.avi", compression=15)
-#input_file = "temp.avi"
-#output_file = "output_glitched.avi"
-#avi_data = extract_avi_data(input_file)
-#create_datamoshed_avi(avi_data, input_file, output_file, start_at=[143,275,545,673], end_at=[243,325,665,723], duplicated_p_frames=0, transition_frames=[153,285,555,683])
+if __name__ == "__main__":
+    # Example usage
+    convert_to_avi("test.mp4", "temp.avi", compression=15)
+    input_file = "temp.avi"
+    output_file = "output_glitched.avi"
+    avi_data = extract_avi_data(input_file)
+    create_datamoshed_avi(avi_data, input_file, output_file, start_at=[143,275,545,673], end_at=[243,325,665,723], duplicated_p_frames=0, transition_frames=[153,285,555,683])
