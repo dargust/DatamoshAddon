@@ -38,20 +38,29 @@ class DATAMOSH_OT_run_datamosh(bpy.types.Operator):
         create_datamoshed_avi(avi_data, temp_file, output_file, start_at=start_points, end_at=end_points, duplicated_p_frames=0, transition_frames=start_frames)
         self.report({'INFO'}, "Datamoshing complete")
 
+        # Store the list of sequences before adding the new movie strip
+        sequences_before = set(sequence_editor.sequences_all)
+
         # Add the output_file as a new movie sequence to the timeline
         bpy.ops.sequencer.movie_strip_add(filepath=output_file, frame_start=1)
 
+        # Store the list of sequences after adding the new movie strip
+        sequences_after = set(sequence_editor.sequences_all)
+
+        # Identify the newly added sequence
+        new_sequence = (sequences_after - sequences_before).pop()
+
         # Set the proxy settings for the newly added movie strip
-        new_strip = sequence_editor.sequences_all[-1]
-        new_strip.use_proxy = False
-        new_strip.proxy.build_25 = False
-        new_strip.proxy.build_50 = False
-        new_strip.proxy.build_75 = False
-        new_strip.proxy.build_100 = False
-        new_strip.proxy.quality = 50
-        
+        if new_sequence.type == 'MOVIE':
+            new_sequence.use_proxy = False
+            new_sequence.proxy.build_25 = False
+            new_sequence.proxy.build_50 = False
+            new_sequence.proxy.build_75 = False
+            new_sequence.proxy.build_100 = False
+            new_sequence.proxy.quality = 50
+
         return {'FINISHED'}
-    
+
 class DATAMOSH_OT_get_start_frames(bpy.types.Operator):
     bl_idname = "datamosh.get_start_frames"
     bl_label = "Get Start Frames"
