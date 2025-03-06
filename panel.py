@@ -1,5 +1,5 @@
 import bpy
-from bpy.props import StringProperty, BoolProperty # type: ignore
+from bpy.props import StringProperty
 
 class DATAMOSH_PT_panel(bpy.types.Panel):
     bl_label = "Datamosh"
@@ -10,10 +10,17 @@ class DATAMOSH_PT_panel(bpy.types.Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator("datamosh.run_datamosh")
-        layout.operator("datamosh.get_start_frames")
-
         scene = context.scene
+        sequence_editor = scene.sequence_editor
+
+        has_sequences = sequence_editor and len(sequence_editor.sequences_all) > 0
+        has_valid_inputs = bool(scene.datamosh_start_frames.strip()) and bool(scene.datamosh_start_points.strip()) and bool(scene.datamosh_end_points.strip())
+
+        if (has_sequences and has_valid_inputs):
+            layout.operator("datamosh.run_datamosh", text="Run Datamosh")
+
+        layout.operator("datamosh.get_start_frames", text="Get Start Frames")
+
         layout.prop(scene, "datamosh_start_frames")
         layout.prop(scene, "datamosh_start_points")
         layout.prop(scene, "datamosh_end_points")
@@ -41,3 +48,6 @@ def unregister():
     del bpy.types.Scene.datamosh_start_frames
     del bpy.types.Scene.datamosh_start_points
     del bpy.types.Scene.datamosh_end_points
+
+if __name__ == "__main__":
+    register()

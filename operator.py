@@ -10,47 +10,85 @@ class DATAMOSH_OT_run_datamosh(bpy.types.Operator):
     bl_label = "Run Datamosh"
     bl_description = "Run the datamoshing script on the rendered video"
 
-    def execute(self, context):
-        scene = context.scene
-        rendered_video = bpy.path.abspath(scene.render.filepath)
+    _timer = None
+    _progress = 0.0
 
-        if not os.path.exists(rendered_video):
+    def execute(self, context):
+        print(f"Running datamosh script by Dan Argust")
+        scene = context.scene
+
+        self.rendered_video = scene.render.frame_path()
+        print(f"frame path: {self.rendered_video}")
+
+        if not os.path.exists(self.rendered_video):
             self.report({'ERROR'}, "Rendered video file does not exist.")
             return {'CANCELLED'}
-        print(f"Attempting to datamosh: {rendered_video}")
-        input_file = rendered_video
-        temp_file = os.path.splitext(input_file)[0] + "_temp.avi"
-        output_file = os.path.splitext(input_file)[0] + "_glitched.avi"
+        
+        self.input_file = self.rendered_video
+        self.temp_file = os.path.splitext(self.input_file)[0] + "_temp.avi"
+        self.output_file = os.path.splitext(self.input_file)[0] + "_glitched.avi"
 
-        sequence_editor = scene.sequence_editor
-        if not sequence_editor:
+        if self.input_file[:-4] == ".avi":
+            self.temp_file = self.input_file
+
+        self.sequence_editor = scene.sequence_editor
+        if not self.sequence_editor:
             self.report({'ERROR'}, "No sequence editor found in the current scene.")
             return {'CANCELLED'}
 
-        start_frames = [int(x) for x in scene.datamosh_start_frames.split(',')]
-        start_points = [int(x) for x in scene.datamosh_start_points.split(',')]
-        end_points = [int(x) for x in scene.datamosh_end_points.split(',')]
+        self.start_frames = [int(x) for x in scene.datamosh_start_frames.split(',')]
+        self.start_points = [int(x) for x in scene.datamosh_start_points.split(',')]
+        self.end_points = [int(x) for x in scene.datamosh_end_points.split(',')]
 
-        print(f"Movie clip start frames: {start_frames}")
+        self.steps = [
+            self.convert_to_avi_step,
+            self.extract_avi_data_step,
+            self.create_datamoshed_avi_step,
+            self.add_movie_strip_step,
+            self.cleanup_temp_files
+        ]
+        if self.input_file == self.temp_file:
+            self.steps = self.steps[1:]
 
-        convert_to_avi(input_file, temp_file)
-        avi_data = extract_avi_data(temp_file)
-        create_datamoshed_avi(avi_data, temp_file, output_file, start_at=start_points, end_at=end_points, duplicated_p_frames=0, transition_frames=start_frames)
-        self.report({'INFO'}, "Datamoshing complete")
+        self.current_step = 0
 
-        # Store the list of sequences before adding the new movie strip
-        sequences_before = set(sequence_editor.sequences_all)
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.1, window=context.window)
+        wm.modal_handler_add(self)
+        return {'RUNNING_MODAL'}
 
-        # Add the output_file as a new movie sequence to the timeline
-        bpy.ops.sequencer.movie_strip_add(filepath=output_file, frame_start=1)
+    def modal(self, context, event):
+        if event.type == 'TIMER':
+            if self.current_step < len(self.steps):
+                self.steps[self.current_step]()
+                self.current_step += 1
+                self._progress = self.current_step / len(self.steps)
+                context.area.tag_redraw()
+            else:
+                self.report({'INFO'}, "Datamoshing complete")
+                wm = context.window_manager
+                wm.event_timer_remove(self._timer)
+                return {'FINISHED'}
+        return {'RUNNING_MODAL'}
 
-        # Store the list of sequences after adding the new movie strip
-        sequences_after = set(sequence_editor.sequences_all)
+    def convert_to_avi_step(self):
+        print(f"Converting to AVI: {self.input_file}")
+        convert_to_avi(self.input_file, self.temp_file)
 
-        # Identify the newly added sequence
+    def extract_avi_data_step(self):
+        print(f"Extracting AVI data: {self.temp_file}")
+        self.avi_data = extract_avi_data(self.temp_file)
+
+    def create_datamoshed_avi_step(self):
+        print(f"Creating datamoshed AVI: {self.output_file}")
+        create_datamoshed_avi(self.avi_data, self.temp_file, self.output_file, start_at=self.start_points, end_at=self.end_points, duplicated_p_frames=0, transition_frames=self.start_frames)
+
+    def add_movie_strip_step(self):
+        print(f"Adding movie strip: {self.output_file}")
+        sequences_before = set(self.sequence_editor.sequences_all)
+        bpy.ops.sequencer.movie_strip_add(filepath=self.output_file, frame_start=1)
+        sequences_after = set(self.sequence_editor.sequences_all)
         new_sequence = (sequences_after - sequences_before).pop()
-
-        # Set the proxy settings for the newly added movie strip
         if new_sequence.type == 'MOVIE':
             new_sequence.use_proxy = False
             new_sequence.proxy.build_25 = False
@@ -58,8 +96,18 @@ class DATAMOSH_OT_run_datamosh(bpy.types.Operator):
             new_sequence.proxy.build_75 = False
             new_sequence.proxy.build_100 = False
             new_sequence.proxy.quality = 50
+    
+    def cleanup_temp_files(self):
+        print(f"Cleaning up temp files: {self.temp_file}")
+        if os.path.exists(self.temp_file):
+            os.remove(self.temp_file)
+        else:
+            print("Temp file not found")
 
-        return {'FINISHED'}
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Datamoshing in progress...")
+        layout.prop(self, "_progress", text="Progress")
 
 class DATAMOSH_OT_get_start_frames(bpy.types.Operator):
     bl_idname = "datamosh.get_start_frames"
@@ -96,3 +144,6 @@ def register():
 def unregister():
     bpy.utils.unregister_class(DATAMOSH_OT_run_datamosh)
     bpy.utils.unregister_class(DATAMOSH_OT_get_start_frames)
+
+if __name__ == "__main__":
+    register()
